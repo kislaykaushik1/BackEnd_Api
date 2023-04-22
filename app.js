@@ -102,9 +102,9 @@ app.post("/api/users", async (req, res) => {
   }
 });
 
-app.get("/api/user", authenticateToken, async (req, res) => {
+app.get("/api/user/:id", authenticateToken, async (req, res) => {
   try {
-    const userId = req.userId;
+    const userId = req.params.id;
 
     const user = await User.findById(userId);
     const followersCount = user?.followers.length;
@@ -373,35 +373,38 @@ app.post("/api/unlike/:id", authenticateToken, async (req, res) => {
 //     });
 // });
 
-app.post("/api/comment/:id", authenticateToken, async (req, res) => {
-  try {
-    const post = await Post.findById(req.params.id);
-    if (!post) {
-      return res.status(404).json({ message: "Post not found" });
+app.post(
+  "/api/comment/:user_id/:post_id",
+  authenticateToken,
+  async (req, res) => {
+    try {
+      const post = await Post.findById(req.params.post_id);
+      if (!post) {
+        return res.status(404).json({ message: "Post not found" });
+      }
+      const user = await User.findById(req.params.user_id);
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      const comment = new Comment({
+        user: user._id,
+        post: post._id,
+        text: req.body.comment,
+      });
+
+      await comment.save();
+
+      post.comments.push(comment._id);
+      await post.save();
+
+      res.json({ message: "Comment added", comment_id: comment._id });
+    } catch (err) {
+      console.error(err);
+      res.status(500).json({ message: "Server Error" });
     }
-
-    const user = await User.findById(req.user.id);
-    if (!user) {
-      return res.status(404).json({ message: "User not found" });
-    }
-
-    const comment = new Comment({
-      user: user.id,
-      post: post.id,
-      text: req.body.text,
-    });
-
-    await comment.save();
-
-    post.comments.push(comment.id);
-    await post.save();
-
-    res.json({ message: "Comment added", comment_id: comment.id });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ message: "Server Error" });
   }
-});
+);
 
 // GET a single post with id
 app.get("/api/posts/:id", authenticateToken, async (req, res) => {
